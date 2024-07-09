@@ -17,7 +17,7 @@ cursor.execute('''CREATE TABLE IF NOT EXISTS players (
                   id INTEGER PRIMARY KEY,
                   name TEXT NOT NULL,
                   plays INTEGER NOT NULL,
-                  highest_score INTEGER NOT NULL)''')
+                  high_score INTEGER NOT NULL)''')
 
 # table 2 - leaderboard
 cursor.execute('''
@@ -45,10 +45,10 @@ BLACK: tuple = (0, 0, 0)
 RED: tuple = (255, 0, 0)
 
 # resources path's
-BG_PATH: str = r"\resources\tunnel_road.jpg"
-CHAR_PATH: str = r"\resources\spr_bike_0.png"
-PROJECTILE_PATH: str = r"\resources\blade_3.png"
-OBSTACLE_PATH: str = r"\resources\swinging_spike_stick.png"
+BG_PATH: str = "resources/background.jpg"
+CHAR_PATH: str = "resources/player.png"
+PROJECTILE_PATH: str = "resources/projectile.png"
+OBSTACLE_PATH: str = "resources/obstacle.png"
 
 # load images
 player_img = pygame.image.load(CHAR_PATH).convert_alpha()
@@ -97,7 +97,7 @@ DAMAGE_INCREASE_RATE: float = 1
 wave_number: int = 1
 points_this_wave: int = 0
 points_per_wave: int = 10
-WAVE_NOTIFICATION_DURATION = 2000  # in milliseconds
+WAVE_NOTIFICATION_DURATION = 1500  # in milliseconds
 
 # scale images if needed
 player_img = pygame.transform.rotate(player_img, 90)
@@ -109,7 +109,7 @@ background_img = pygame.transform.scale(background_img, (WIDTH, HEIGHT))
 # game state
 score: int = 0
 previous_score: int = 0
-game_state: str = "playing"  # playing, game_over, input_name, leaderboard
+game_state: str = "playing"  # playing, game_over, input_name, leaderboard, player_data
 player_name: str = ""
 
 # font setup
@@ -117,24 +117,18 @@ font: pygame.font.Font = pygame.font.Font(None, 36)
 
 
 # database functions
-def chk_usr(name: str, player_score: int) -> bool:
-    found: bool = False
-    current_highest_score: int = 0
-    cursor.execute('''SELECT * FROM players''')
-    rows = cursor.fetchall()
-    for row in rows:
-        if row[1] == name:
-            current_highest_score = row[3]
-            found = True
+def chk_usr(name: str, player_score: int) -> None:
+    cursor.execute('''SELECT * FROM players WHERE name = ?''', (name,))
+    row = cursor.fetchone()
 
-    if found:
-        new_highest_score: int = max(player_score, current_highest_score)
-        cursor.execute(
-            f'''UPDATE players set plays = plays + 1 and highest_score = {new_highest_score} where name = {name}''')
+    if row:
+        current_high_score: int = row[3]
+        new_high_score: int = int(max(current_high_score, player_score))
+        cursor.execute('''UPDATE players SET plays = plays+1, high_score = ? WHERE name = ?''', (new_high_score, name))
     else:
-        cursor.execute('''INSERT INTO players (name, plays, highest_score) VALUES (?, ?, ?)''', (name, 1, score))
+        cursor.execute('''INSERT INTO players (name, plays, high_score) VALUES (?, ?, ?)''', (name, 1, score))
     con.commit()
-    return found
+    return None
 
 
 # drawing functions
@@ -204,13 +198,13 @@ def show_leaderboard() -> None:
     leaderboard_text: pygame.Surface = font.render("Leaderboard", True, WHITE)
     screen.blit(leaderboard_text, (WIDTH // 2 - leaderboard_text.get_width() // 2, 50))
 
-    cursor.execute('''SELECT name, highest_score FROM leaderboard ORDER BY highest_score DESC LIMIT 5''')
+    cursor.execute('''SELECT name, highest_score FROM leaderboard ORDER BY highest_score DESC LIMIT 10''')
     for idx, (name, high_score) in enumerate(cursor.fetchall(), 1):
         entry_text: pygame.Surface = font.render(f"{idx}. {name}: {high_score}", True, WHITE)
         screen.blit(entry_text, (WIDTH // 2 - entry_text.get_width() // 2, 100 + idx * 40))
 
-    restart_text: pygame.Surface = font.render("Press R to restart", True, WHITE)
-    screen.blit(restart_text, (WIDTH // 2 - restart_text.get_width() // 2, HEIGHT - 100))
+    continue_text: pygame.Surface = font.render("Press ENTER to continue", True, WHITE)
+    screen.blit(continue_text, (WIDTH // 2 - continue_text.get_width() // 2, HEIGHT - 100))
 
     return None
 
@@ -221,6 +215,57 @@ def show_wave_notification(wave: int) -> None:
     pygame.display.flip()
     pygame.time.wait(WAVE_NOTIFICATION_DURATION)
     return None
+
+
+def show_player_data() -> None:
+    global game_state
+
+    # fetch all player's data, ordered by number of plays
+    cursor.execute('''SELECT name, plays, high_score FROM players ORDER BY plays DESC''')
+    player_data = cursor.fetchall()
+
+    # variables for scrolling
+    scroll_position: int = 0
+    players_per_page: int = 10
+
+    while game_state == "player_data":
+        screen.fill(WHITE)
+
+        # display title
+        title_text: pygame.Surface = font.render("Player Data", True, WHITE)
+        screen.blit(title_text, (WIDTH // 2 - title_text.get_width() // 2, 20))
+
+        # displaying player's data
+        for i, (name, plays, high_score) in enumerate(player_data[scroll_position:scroll_position + players_per_page]):
+            player_text: pygame.Surface = font.render(f"{i+scroll_position+1}. {name}: {plays} times played, High "
+                                                      f"Score: {high_score}", True, WHITE)
+            screen.blit(player_text, (50, 80 + i * 40))
+
+        # display scroll instructions
+        if len(player_data) > players_per_page:
+            scroll_text: pygame.Surface = font.render("Use Up/Down arrows to scroll", True, WHITE)
+            screen.blit(scroll_text, (WIDTH // 2 - scroll_text.get_width() // 2, HEIGHT - 60))
+
+        # display continue instructions
+        continue_text: pygame.Surface = font.render("Press ENTER to restart the game", True, WHITE)
+        screen.blit(continue_text, (WIDTH // 2 - continue_text.get_width() // 2, HEIGHT - 30))
+
+        pygame.display.flip()
+
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                sys.exit()
+            elif event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_UP and scroll_position > 0:
+                    scroll_position -= 1
+                elif event.key == pygame.K_DOWN and scroll_position < len(player_data) - players_per_page:
+                    scroll_position += 1
+                elif event.key == pygame.K_RETURN:
+                    game_state = "playing"
+                    reset_game()
+        clock.tick(FPS)
+        return None
 
 
 def reset_game() -> None:
@@ -278,7 +323,10 @@ def main() -> None:
                     else:
                         player_name += event.unicode
                 elif game_state == "leaderboard":
-                    if event.key == pygame.K_r:
+                    if event.key == pygame.K_RETURN:
+                        game_state = "player_data"
+                elif game_state == "player_data":
+                    if event.key == pygame.K_RETURN:
                         reset_game()
 
         keys = pygame.key.get_pressed()
@@ -394,6 +442,8 @@ def main() -> None:
             show_name_input()
         elif game_state == "leaderboard":
             show_leaderboard()
+        elif game_state == "player_data":
+            show_player_data()
 
         pygame.display.flip()
 
