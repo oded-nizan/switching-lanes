@@ -45,10 +45,10 @@ BLACK: tuple = (0, 0, 0)
 RED: tuple = (255, 0, 0)
 
 # resources path's
-BG_PATH: str = r"C:\Users\Oded\PycharmProjects\switching_lanes\src\resources\tunnel_road.jpg"
-CHAR_PATH: str = r"C:\Users\Oded\PycharmProjects\switching_lanes\src\resources\spr_bike_0.png"
-PROJECTILE_PATH: str = r"C:\Users\Oded\PycharmProjects\switching_lanes\src\resources\blade_3.png"
-OBSTACLE_PATH: str = r"C:\Users\Oded\PycharmProjects\switching_lanes\src\resources\swinging_spike_stick.png"
+BG_PATH: str = r"\resources\tunnel_road.jpg"
+CHAR_PATH: str = r"\resources\spr_bike_0.png"
+PROJECTILE_PATH: str = r"\resources\blade_3.png"
+OBSTACLE_PATH: str = r"\resources\swinging_spike_stick.png"
 
 # load images
 player_img = pygame.image.load(CHAR_PATH).convert_alpha()
