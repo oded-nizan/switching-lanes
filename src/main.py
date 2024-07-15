@@ -72,19 +72,19 @@ current_lane: float = 1  # 0: left, 1: center, 2: right
 OBSTACLE_WIDTH: int = 120
 OBSTACLE_HEIGHT: int = 80
 obstacles = []
-obstacle_speed: float = 2
-obstacle_spawn_time: int = 2500  # in milliseconds
+obstacle_speed: float = 3
+obstacle_spawn_time: int = 2000  # in milliseconds
 last_obstacle_spawn: int = pygame.time.get_ticks()
 obstacle_min_health: int = 1
-obstacle_max_health: int = 3
+obstacle_max_health: int = 4
 
 # projectile variables
 PROJECTILE_WIDTH: int = 50
 PROJECTILE_HEIGHT: int = 50
 projectiles = []
-projectile_speed: float = 15
+projectile_speed: float = 12
 projectile_damage: float = 1
-projectile_cooldown: int = 500  # in milliseconds
+projectile_cooldown: int = 750  # in milliseconds
 last_projectile_time: int = 0
 
 # difficulty increase variables
@@ -160,16 +160,20 @@ def get_lane_x(lane: int) -> int:
 def spawn_obstacle() -> None:
     global obstacles
     lanes_spawned: [int] = []
-    num_obstacles: int = int(min(3, 1 + wave_number // 3))
-    for _ in range(num_obstacles):
-        lane: int = random.randint(0, 2)
-        while lane in lanes_spawned:
+    num_chances: int = int(max(2, 1 + wave_number // 3))
+    for _ in range(num_chances):
+        chk: int = random.randint(0, (wave_number + 4) // 2)
+        if chk == 0:
             lane: int = random.randint(0, 2)
-        lanes_spawned.append(lane)
-        x = get_lane_x(lane)
-        y = -OBSTACLE_HEIGHT
-        health = random.uniform(obstacle_min_health, obstacle_max_health)
-        obstacles.append({'x': x, 'y': y, 'health': health})
+            while lane in lanes_spawned:
+                lane: int = random.randint(0, 2)
+            lanes_spawned.append(lane)
+            x = get_lane_x(lane)
+            y = -OBSTACLE_HEIGHT
+            health = random.uniform(obstacle_min_health, obstacle_max_health)
+            obstacles.append({'x': x, 'y': y, 'health': health})
+        if len(lanes_spawned) == 3:
+            return None
     return None
 
 
@@ -406,18 +410,18 @@ def main() -> None:
                 obstacle_max_health = min(obstacle_max_health, 50)
                 obstacle_min_health = min(obstacle_min_health, obstacle_max_health - 2)
 
-                # Increase projectile damage every 2 waves
+                # Increase projectile damage every 4 waves
                 if wave_number % 4 == 0:
                     projectile_damage += DAMAGE_INCREASE_RATE
                     projectile_damage = min(projectile_damage, 25)
 
                 # Adjust speed increases
-                player_speed += SPEED_INCREASE_RATE / wave_number
-                obstacle_speed += SPEED_INCREASE_RATE / wave_number
+                player_speed += SPEED_INCREASE_RATE - (wave_number / 10)
+                obstacle_speed += SPEED_INCREASE_RATE - (wave_number / 20)
 
                 # Decrease cooldowns
-                obstacle_spawn_time = max(obstacle_spawn_time - COOLDOWN_DECREASE_RATE, 500)
-                projectile_cooldown = max(projectile_cooldown - COOLDOWN_DECREASE_RATE // 3, 50)
+                obstacle_spawn_time = max(obstacle_spawn_time - (COOLDOWN_DECREASE_RATE*2), 250)
+                projectile_cooldown = max(projectile_cooldown - COOLDOWN_DECREASE_RATE, 75)
 
                 # Print difficulty stats for debugging
                 print(f"Wave: {wave_number}, Player Speed: {player_speed:.2f}, Obstacle Speed: {obstacle_speed:.2f}")
