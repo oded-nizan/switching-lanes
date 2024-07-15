@@ -442,6 +442,9 @@ def main() -> None:
                     projectile_damage += DAMAGE_INCREASE_RATE
                     projectile_damage = min(projectile_damage, 25)
 
+                    # increase obstacle speed often
+                    obstacle_speed += SPEED_INCREASE_RATE - (wave_number // 10)
+
                     # Increase obstacle health
                     obstacle_min_health += HEALTH_INCREASE_RATE
                     obstacle_max_health += HEALTH_INCREASE_RATE
