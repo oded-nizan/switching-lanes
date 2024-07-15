@@ -90,7 +90,7 @@ last_projectile_time: int = 0
 # difficulty increase variables
 SPEED_INCREASE_RATE: float = 1
 COOLDOWN_DECREASE_RATE: int = 50
-HEALTH_INCREASE_RATE: float = 1
+HEALTH_INCREASE_RATE: float = 2
 DAMAGE_INCREASE_RATE: float = 1
 
 # wave mechanics
@@ -98,6 +98,11 @@ wave_number: int = 1
 points_this_wave: int = 0
 points_per_wave: int = 10
 WAVE_NOTIFICATION_DURATION = 1500  # in milliseconds
+
+# player inactivity variables
+player_last_move_time: int = 0
+player_inactive_cycles: int = 0
+INACTIVITY_THRESHOLD: int = 3
 
 # scale images if needed
 player_img = pygame.transform.rotate(player_img, 90)
@@ -160,9 +165,9 @@ def get_lane_x(lane: int) -> int:
 def spawn_obstacle() -> None:
     global obstacles
     lanes_spawned: [int] = []
-    num_chances: int = int(max(2, 1 + wave_number // 3))
+    num_chances: int = int(max(3, wave_number))
     for _ in range(num_chances):
-        chk: int = random.randint(0, (wave_number + 4) // 2)
+        chk: int = random.randint(0, (wave_number + 2) // 2)
         if chk == 0:
             lane: int = random.randint(0, 2)
             while lane in lanes_spawned:
@@ -294,7 +299,7 @@ def main() -> None:
     global current_lane, player_x, score, last_obstacle_spawn, game_state, obstacle_spawn_time, obstacle_speed, \
         last_projectile_time, player_name, projectile_damage, projectile_cooldown, obstacle_min_health, \
         obstacle_max_health, player_speed, projectile_speed, previous_score, points_this_wave, wave_number, \
-        points_per_wave
+        points_per_wave, player_last_move_time, player_inactive_cycles
     running: bool = True
     while running:
         clock.tick(FPS)
@@ -335,11 +340,22 @@ def main() -> None:
 
         keys = pygame.key.get_pressed()
         if game_state == "playing":
+
+            current_time: int = pygame.time.get_ticks()
+            player_moved: bool = False
+
             # move player
             if keys[pygame.K_a] and current_lane > 0:
                 current_lane = max(0, current_lane - 0.1)
+                player_moved = True
             if keys[pygame.K_d] and current_lane < 2:
                 current_lane = min(2, current_lane + 0.1)
+                player_moved = True
+
+            # check player activity
+            if player_moved:
+                player_last_move_time = current_time
+                player_inactive_cycles = 0
 
             target_x: int = get_lane_x(int(current_lane))
             if player_x < target_x:
@@ -352,6 +368,17 @@ def main() -> None:
             if current_time - last_obstacle_spawn > obstacle_spawn_time:
                 spawn_obstacle()
                 last_obstacle_spawn = current_time
+
+                # adjust for player activity
+                if not player_moved:
+                    player_inactive_cycles += 1
+                    if player_inactive_cycles >= INACTIVITY_THRESHOLD:
+                        # randomly move the player to a different lane to prevent farming
+                        new_lane: int = current_lane
+                        while new_lane == current_lane:
+                            new_lane = random.randint(0, 2)
+                        current_lane = new_lane
+                        player_inactive_cycles = 0
 
             # move and remove obstacles
             for obstacle in obstacles[:]:
@@ -415,12 +442,24 @@ def main() -> None:
                     projectile_damage += DAMAGE_INCREASE_RATE
                     projectile_damage = min(projectile_damage, 25)
 
+                    # Increase obstacle health
+                    obstacle_min_health += HEALTH_INCREASE_RATE
+                    obstacle_max_health += HEALTH_INCREASE_RATE
+
+                    # Ensure min and max health are integers
+                    obstacle_min_health = int(obstacle_min_health)
+                    obstacle_max_health = int(obstacle_max_health)
+
+                    # Cap the max and min health
+                    obstacle_max_health = min(obstacle_max_health, 50)
+                    obstacle_min_health = min(obstacle_min_health, obstacle_max_health - 2)
+
                 # Adjust speed increases
                 player_speed += SPEED_INCREASE_RATE - (wave_number / 10)
-                obstacle_speed += SPEED_INCREASE_RATE - (wave_number / 20)
+                obstacle_speed += SPEED_INCREASE_RATE - (wave_number // 10)
 
                 # Decrease cooldowns
-                obstacle_spawn_time = max(obstacle_spawn_time - (COOLDOWN_DECREASE_RATE*2), 250)
+                obstacle_spawn_time = max(obstacle_spawn_time - (COOLDOWN_DECREASE_RATE*4), 250)
                 projectile_cooldown = max(projectile_cooldown - COOLDOWN_DECREASE_RATE, 75)
 
                 # Print difficulty stats for debugging
