@@ -32,7 +32,7 @@ pygame.init()
 
 # display variables
 WIDTH: int = 900
-HEIGHT: int = 1300
+HEIGHT: int = 900 # To fit the macOS screen
 WINDOW_NAME: str = "Switching Lanes"
 
 # initialize display
